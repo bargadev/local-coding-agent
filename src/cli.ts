@@ -3,12 +3,23 @@ import 'dotenv/config';
 import * as readline from 'readline';
 import { ensureClaudeCLI } from './setup/index.js';
 import { respond } from './agent/respond.js';
+import { gitSnapshot, formatGitSummary } from './tools/git.js';
 
 const EXIT_COMMANDS = new Set(['exit', 'quit', 'q', '.exit']);
 
 async function runOnce(prompt: string): Promise<void> {
+  let gitBefore = { status: '', branch: '' };
+  try { gitBefore = gitSnapshot(); } catch { /* not a git repo */ }
+
   const answer = await respond(prompt);
   console.log('\n' + answer + '\n');
+
+  try {
+    const summary = formatGitSummary(gitBefore);
+    if (!summary.includes('(no changes)')) {
+      console.log('\n── git summary ──\n' + summary + '\n');
+    }
+  } catch { /* not a git repo */ }
 }
 
 async function runInteractive(): Promise<void> {
