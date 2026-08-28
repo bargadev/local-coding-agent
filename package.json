@@ -1,0 +1,28 @@
+{
+  "name": "local-coding-agent",
+  "version": "0.1.0",
+  "description": "Local coding agent powered by Ollama",
+  "main": "dist/cli.js",
+  "bin": {
+    "agent": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx watch src/cli.ts",
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "Lucas Barga",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}
