@@ -4,6 +4,7 @@ import { routeTask } from './router.js';
 import type { Backend } from './router.js';
 import { Spinner } from '../cli/spinner.js';
 import { runAgentLoop } from './loop.js';
+import { saveSession } from '../session/index.js';
 
 // Backends that support the agent loop (tool calling via JSON in text)
 const AGENT_BACKENDS: Backend[] = ['sonnet', 'opus'];
@@ -24,12 +25,18 @@ export async function respond(prompt: string): Promise<string> {
   try {
     const llm = buildClient(backend);
 
+    const start = Date.now();
     let content: string;
+    let iterations = 1;
+    let toolCallCount = 0;
+
     if (useLoop) {
       spinner.stop();
       const result = await runAgentLoop(prompt, llm);
       process.stderr.write(`  [${result.iterations} iterations, ${result.toolCalls} tool calls]\n`);
       content = result.response;
+      iterations = result.iterations;
+      toolCallCount = result.toolCalls;
     } else {
       const response = await llm.chat([
         { role: 'system', content: 'You are a helpful software engineering assistant.' },
@@ -38,6 +45,17 @@ export async function respond(prompt: string): Promise<string> {
       spinner.stop(response.tokens, isLocal);
       content = response.content;
     }
+
+    try {
+      saveSession({
+        prompt,
+        backend,
+        iterations,
+        toolCalls: [],
+        finalResponse: content,
+        durationMs: Date.now() - start,
+      });
+    } catch { /* session save failure is non-fatal */ }
 
     return content;
   } catch (err) {
