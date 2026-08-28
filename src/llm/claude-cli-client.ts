@@ -35,10 +35,14 @@ export class ClaudeCLIClient implements LLMClient {
       maxBuffer: 10 * 1024 * 1024,
     });
 
+    const content = output.trim();
+    // Claude CLI doesn't expose token counts — estimate from word count
+    const estimatedTokens = Math.round(content.split(/\s+/).length * 1.3);
     return {
-      content: output.trim(),
+      content,
       model: this.modelId,
       done: true,
+      tokens: estimatedTokens,
     };
   }
 }

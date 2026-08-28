@@ -9,6 +9,8 @@ export interface LLMResponse {
   content: string;
   model: string;
   done: boolean;
+  tokens?: number;      // output tokens (undefined = unknown)
+  durationMs?: number;  // total time in ms
 }
 
 export interface LLMClient {

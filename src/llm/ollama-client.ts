@@ -9,6 +9,9 @@ interface OllamaChatResponse {
   model: string;
   message: { role: string; content: string };
   done: boolean;
+  eval_count?: number;
+  eval_duration?: number;
+  total_duration?: number;
 }
 
 export class OllamaLLMClient implements LLMClient {
@@ -42,6 +45,8 @@ export class OllamaLLMClient implements LLMClient {
       content: data.message.content,
       model: data.model,
       done: data.done,
+      tokens: data.eval_count ?? 0,
+      durationMs: data.total_duration ? Math.round(data.total_duration / 1e6) : undefined,
     };
   }
 
