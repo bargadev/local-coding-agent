@@ -12,7 +12,7 @@ export interface AgentResult {
 
 export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentResult> {
   const messages: Message[] = [
-    { role: 'system', content: buildSystemPrompt() },
+    { role: 'system', content: buildSystemPrompt(task) },
     { role: 'user', content: task },
   ];
 
