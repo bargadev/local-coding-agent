@@ -3,7 +3,7 @@ import { readFile } from './read-file.js';
 import { searchFiles } from './search-files.js';
 import { writeFile } from './write-file.js';
 import { runCommand } from './run-command.js';
-import { gitStatus, gitDiff } from './git.js';
+import { gitStatus, gitDiff, gitLog } from './git.js';
 
 export interface ToolCall {
   tool: string;
@@ -31,6 +31,7 @@ const TOOLS: Record<string, ToolFn> = {
   },
   git_status: () => gitStatus(),
   git_diff: () => gitDiff(),
+  git_log: (a) => gitLog(a.n ? parseInt(a.n) : 5),
 };
 
 export function executeTool(call: ToolCall): string {
