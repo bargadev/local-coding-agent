@@ -111,6 +111,33 @@ Sem cache semântico na primeira versão — complexidade desnecessária agora.
 
 ---
 
+## Análise: SmarterRouter para nosso caso (M2 8GB, uso pessoal)
+
+### Cache semântico
+- Mantém até 500 entradas com TTL de 1h + LRU eviction
+- **Para uso pessoal:** hit rate baixo — raramente a mesma tarefa se repete
+- **Útil no agent loop (Fase 11+):** o modelo pode chamar as mesmas ferramentas com os mesmos args várias vezes na mesma sessão
+- **Decisão:** implementar na Fase 13 (context manager), não antes
+
+### VRAM profiling
+- Rastreia qual modelo está carregado, descarrega via LRU se precisar de memória
+- **Para nosso caso:** irrelevante — Ollama já gerencia VRAM automaticamente no M2, uso pessoal, no máximo 2 modelos
+- **Decisão:** não implementar
+
+### Failover automático
+- Se o modelo primário não responde, escala para o próximo
+- **Para nosso caso:** útil se Ollama estiver offline → cai pro Haiku automaticamente
+- **Decisão:** implementar junto com o ModelRouter (Fase 4), como fallback simples
+
+### Resumo
+| Feature | Ganho real | Quando |
+|---|---|---|
+| Cache semântico | Baixo agora, médio no agent loop | Fase 13 |
+| VRAM profiling | Zero | Nunca |
+| Failover automático | Médio | Fase 4 |
+
+---
+
 ## Referências
 
 - https://github.com/ypollak2/llm-router
