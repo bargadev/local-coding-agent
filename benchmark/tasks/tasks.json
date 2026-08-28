@@ -1,0 +1,62 @@
+[
+  {
+    "id": "T01",
+    "category": "code-generation",
+    "prompt": "Add a function called 'clamp' to src/utils/math.ts that limits a number between a min and max value. Add a test for it in tests/math.test.ts.",
+    "successCriteria": "clamp function exists and tests pass"
+  },
+  {
+    "id": "T02",
+    "category": "bug-fix",
+    "prompt": "In src/auth/service.ts, the login function doesn't normalize the email to lowercase before validating. Fix this bug so that 'User@Example.COM' works the same as 'user@example.com'.",
+    "successCriteria": "email normalized to lowercase in login function"
+  },
+  {
+    "id": "T03",
+    "category": "validation",
+    "prompt": "Add email validation to createUser in src/users/service.ts. It should throw an Error with message 'Invalid email' if the email is not valid.",
+    "successCriteria": "createUser throws on invalid email"
+  },
+  {
+    "id": "T04",
+    "category": "unit-test",
+    "prompt": "Write unit tests for src/payments/service.ts covering: createPayment success, createPayment with negative amount, completePayment, getPaymentsByUser.",
+    "successCriteria": "tests exist and pass"
+  },
+  {
+    "id": "T05",
+    "category": "refactor",
+    "prompt": "Refactor src/users/service.ts to validate that name is not empty and email is valid before creating a user. Throw descriptive errors for each case.",
+    "successCriteria": "validation added, existing tests still pass"
+  },
+  {
+    "id": "T06",
+    "category": "debugging",
+    "prompt": "In src/utils/math.ts, the divide function throws 'Division by zero' but the error message should say 'Cannot divide by zero'. Fix it and update any existing tests.",
+    "successCriteria": "error message updated"
+  },
+  {
+    "id": "T07",
+    "category": "feature-multi-file",
+    "prompt": "Add a 'findUserByEmail' function to src/users/service.ts and a corresponding test in tests/users.test.ts.",
+    "successCriteria": "function exists with test"
+  },
+  {
+    "id": "T08",
+    "category": "api-change",
+    "prompt": "Change createPayment in src/payments/service.ts to accept an options object {userId, amount, currency} instead of positional parameters. Update all callers.",
+    "successCriteria": "signature changed, tests pass"
+  },
+  {
+    "id": "T09",
+    "category": "business-rule",
+    "prompt": "Add a maximum payment amount limit of 10000 to createPayment in src/payments/service.ts. Throw an error 'Amount exceeds maximum limit' if exceeded. Add a test.",
+    "successCriteria": "limit enforced with test"
+  },
+  {
+    "id": "T10",
+    "category": "fix-failing-test",
+    "prompt": "The test in tests/auth.test.ts expects login to work with uppercase email 'User@Example.COM'. Make the test pass by fixing the login function.",
+    "successCriteria": "test passes after fix"
+  }
+]
