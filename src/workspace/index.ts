@@ -3,8 +3,9 @@ import * as fs from 'fs';
 
 // Directories never exposed to the agent
 const BLOCKED_DIRS = [
-  '/etc', '/root', '/var', '/sys', '/proc',
-  '/private/etc', '/private/var',
+  '/etc', '/root', '/sys', '/proc',
+  '/private/etc',
+  '/var/root', '/private/var/root',
 ];
 
 const SENSITIVE_PATTERNS = [
