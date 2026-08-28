@@ -26,6 +26,15 @@ Workspace: ${workspace.root}
 - git_status(): show current git status
 - git_diff(): show uncommitted changes
 
+## Correction loop
+
+When you modify code, always follow this sequence:
+1. write_file — make the change
+2. run_command — run the tests ("npm test", "npx vitest run", etc.)
+3. If tests fail: read the error, fix the code, run tests again
+4. Repeat until tests pass or you determine the failure is unrelated to your change
+5. Summarize what changed and the final test result
+
 ## Tool call format
 
 When you need to use a tool, respond with a JSON object on its own line:

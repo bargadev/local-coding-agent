@@ -41,7 +41,14 @@ export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentR
       process.stderr.write(`  ← ${result.slice(0, 120)}${result.length > 120 ? '…' : ''}\n`);
 
       messages.push({ role: 'assistant', content });
-      messages.push({ role: 'user', content: `Tool result for ${call.tool}:\n${result}` });
+
+      // If a command failed, nudge the agent to fix it
+      let toolResultMsg = `Tool result for ${call.tool}:\n${result}`;
+      if (call.tool === 'run_command' && result.includes('exit: 1')) {
+        toolResultMsg += '\n\nTests or command failed. Analyze the error above, fix the code with write_file, and run the tests again.';
+      }
+
+      messages.push({ role: 'user', content: toolResultMsg });
       break; // one tool call per turn
     }
 
