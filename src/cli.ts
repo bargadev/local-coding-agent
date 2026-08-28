@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import 'dotenv/config';
+import { OllamaLLMClient } from './llm/index.js';
+
+const SYSTEM_PROMPT = 'You are a helpful software engineering assistant.';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -7,15 +10,22 @@ async function main() {
 
   if (!prompt) {
     console.log('Usage: agent "<task>"');
-    console.log('Example: agent "explain what a function is in TypeScript"');
     process.exit(0);
   }
 
-  console.log(`Task: ${prompt}`);
-  console.log('(agent not yet implemented — Phase 1)');
+  const llm = OllamaLLMClient.fromEnv();
+
+  process.stdout.write('Thinking...\n');
+
+  const response = await llm.chat([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: prompt },
+  ]);
+
+  console.log('\n' + response.content);
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(err instanceof Error ? err.message : err);
   process.exit(1);
 });
