@@ -1,35 +1,49 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import { OllamaLLMClient, ClaudeCLIClient } from './llm/index.js';
+import * as readline from 'readline';
 import { ensureClaudeCLI } from './setup/index.js';
+import { respond } from './agent/respond.js';
 
-const SYSTEM_PROMPT = 'You are a helpful software engineering assistant.';
+const EXIT_COMMANDS = new Set(['exit', 'quit', 'q', '.exit']);
 
-async function main() {
+async function runOnce(prompt: string): Promise<void> {
+  const answer = await respond(prompt);
+  console.log('\n' + answer + '\n');
+}
+
+async function runInteractive(): Promise<void> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const ask = (q: string) => new Promise<string>((r) => rl.question(q, r));
+
+  console.log('agent — type your task, or "exit" to quit\n');
+
+  while (true) {
+    const input = (await ask('> ')).trim();
+    if (!input) continue;
+    if (EXIT_COMMANDS.has(input.toLowerCase())) break;
+
+    try {
+      const answer = await respond(input);
+      console.log('\n' + answer + '\n');
+    } catch (err) {
+      console.error('Error:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  rl.close();
+}
+
+async function main(): Promise<void> {
+  ensureClaudeCLI();
+
   const args = process.argv.slice(2);
   const prompt = args.join(' ').trim();
 
-  if (!prompt) {
-    console.log('Usage: agent "<task>"');
-    process.exit(0);
+  if (prompt) {
+    await runOnce(prompt);
+  } else {
+    await runInteractive();
   }
-
-  ensureClaudeCLI();
-
-  const backend = process.env.AGENT_BACKEND ?? 'sonnet';
-  const llm =
-    backend === 'local'
-      ? OllamaLLMClient.fromEnv()
-      : new ClaudeCLIClient(backend as 'haiku' | 'sonnet' | 'opus');
-
-  process.stdout.write(`[${backend}] thinking...\n`);
-
-  const response = await llm.chat([
-    { role: 'system', content: SYSTEM_PROMPT },
-    { role: 'user', content: prompt },
-  ]);
-
-  console.log('\n' + response.content);
 }
 
 main().catch((err) => {
