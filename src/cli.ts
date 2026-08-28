@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'dotenv/config';
-import { OllamaLLMClient } from './llm/index.js';
+import { OllamaLLMClient, ClaudeCLIClient } from './llm/index.js';
+import { ensureClaudeCLI } from './setup/index.js';
 
 const SYSTEM_PROMPT = 'You are a helpful software engineering assistant.';
 
@@ -13,9 +14,15 @@ async function main() {
     process.exit(0);
   }
 
-  const llm = OllamaLLMClient.fromEnv();
+  ensureClaudeCLI();
 
-  process.stdout.write('Thinking...\n');
+  const backend = process.env.AGENT_BACKEND ?? 'sonnet';
+  const llm =
+    backend === 'local'
+      ? OllamaLLMClient.fromEnv()
+      : new ClaudeCLIClient(backend as 'haiku' | 'sonnet' | 'opus');
+
+  process.stdout.write(`[${backend}] thinking...\n`);
 
   const response = await llm.chat([
     { role: 'system', content: SYSTEM_PROMPT },
