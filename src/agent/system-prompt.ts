@@ -1,9 +1,11 @@
 import { workspace } from '../workspace/index.js';
+import { buildContext } from '../context/index.js';
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(task = ''): string {
+  const context = buildContext(task);
   return `You are a software engineering agent working inside a code repository.
 
-Workspace: ${workspace.root}
+${context}
 
 ## Rules
 
