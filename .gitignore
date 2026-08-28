@@ -4,3 +4,4 @@ dist/
 .sessions/
 benchmark/results/
 *.log
+lakonai-graph/
