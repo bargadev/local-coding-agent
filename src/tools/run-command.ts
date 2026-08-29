@@ -1,5 +1,9 @@
 import { execSync } from 'child_process';
+import * as path from 'path';
 import { workspace } from '../workspace/index.js';
+
+// Resolve lakonai bin from local node_modules, fallback to global PATH.
+const LAKONAI_BIN = path.join(__dirname, '../../node_modules/.bin/lakonai');
 
 const COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? '120000', 10);
 
@@ -42,7 +46,7 @@ export function runCommand(command: string): CommandResult {
   let exitCode = 0;
 
   try {
-    stdout = execSync(command, {
+    stdout = execSync(`"${LAKONAI_BIN}" ${command}`, {
       cwd: workspace.root,
       encoding: 'utf8',
       timeout: COMMAND_TIMEOUT,

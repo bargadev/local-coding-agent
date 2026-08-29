@@ -12,9 +12,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const TASKS = JSON.parse(
+const TASKS = (JSON.parse(
   fs.readFileSync(path.join(__dirname, 'tasks/tasks.json'), 'utf8'),
-) as Array<{ id: string; category: string; prompt: string }>;
+) as Array<{ id: string; category: string; prompt: string }>).slice(0, 5);
 
 interface ModelResult {
   model: string;

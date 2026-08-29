@@ -9,6 +9,7 @@ interface Task {
   category: string;
   prompt: string;
   successCriteria: string;
+  backend?: string;
 }
 
 interface TaskResult {
@@ -42,8 +43,9 @@ function runTests(): { passed: boolean; output: string } {
 }
 
 function resetProject(): void {
-  // Reset to original state by removing modified files and reinstalling
   execSync('git checkout -- .', { cwd: PROJECT_DIR, stdio: 'ignore' });
+  // Remove untracked files created by the agent (test files, etc.) — exclude node_modules
+  execSync('git clean -fd --exclude=node_modules --exclude=.gitignore', { cwd: PROJECT_DIR, stdio: 'ignore' });
 }
 
 async function runTask(task: Task): Promise<TaskResult> {
@@ -59,9 +61,10 @@ async function runTask(task: Task): Promise<TaskResult> {
       execSync('npm install', { cwd: PROJECT_DIR, stdio: 'ignore' });
     }
 
+    const taskBackend = task.backend ?? backend;
     agentOutput = execSync(
       `npx tsx ${path.join(__dirname, '../src/cli.ts')} "${task.prompt.replace(/"/g, '\\"')}"`,
-      { cwd: PROJECT_DIR, encoding: 'utf8', timeout: 300_000, env: { ...process.env, AGENT_BACKEND: backend } }
+      { cwd: PROJECT_DIR, encoding: 'utf8', timeout: 300_000, env: { ...process.env, AGENT_BACKEND: taskBackend } }
     );
   } catch (err: any) {
     error = err.message ?? String(err);

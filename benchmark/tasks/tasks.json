@@ -58,5 +58,26 @@
     "category": "fix-failing-test",
     "prompt": "The test in tests/auth.test.ts expects login to work with uppercase email 'User@Example.COM'. Make the test pass by fixing the login function.",
     "successCriteria": "test passes after fix"
+  },
+  {
+    "id": "TH1",
+    "category": "haiku-simple-fix",
+    "backend": "haiku",
+    "prompt": "In src/utils/math.ts, the divide function throws 'Division by zero'. Change the error message to 'Cannot divide by zero'.",
+    "successCriteria": "error message updated, tests pass"
+  },
+  {
+    "id": "TH2",
+    "category": "haiku-one-liner",
+    "backend": "haiku",
+    "prompt": "Add an 'abs' function to src/utils/math.ts that returns the absolute value of a number. Export it.",
+    "successCriteria": "abs function exported from math.ts"
+  },
+  {
+    "id": "TL1",
+    "category": "local-trivial-fix",
+    "backend": "local",
+    "prompt": "In src/utils/math.ts, rename the function 'multiply' to 'mul' and update the export.",
+    "successCriteria": "function renamed, tests pass"
   }
 ]

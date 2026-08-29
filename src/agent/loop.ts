@@ -1,6 +1,7 @@
 import type { LLMClient, Message } from '../llm/index.js';
 import { parseToolCall, executeTool } from '../tools/registry.js';
 import { buildSystemPrompt } from './system-prompt.js';
+import { C } from '../cli/spinner.js';
 
 const MAX_ITERATIONS = parseInt(process.env.MAX_AGENT_ITERATIONS ?? '30', 10);
 
@@ -36,9 +37,11 @@ export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentR
       toolCallFound = true;
       toolCalls++;
 
-      process.stderr.write(`  → ${call.tool}(${JSON.stringify(call.args)})\n`);
+      const argStr = Object.entries(call.args).map(([k, v]) => `${k}: ${String(v).slice(0, 40)}`).join(', ');
+      process.stdout.write(`${C.dim}  └ ${call.tool}(${argStr})${C.reset}\n`);
       const result = executeTool(call);
-      process.stderr.write(`  ← ${result.slice(0, 120)}${result.length > 120 ? '…' : ''}\n`);
+      const resultPreview = result.split('\n')[0].slice(0, 80);
+      process.stdout.write(`${C.dim}    ${resultPreview}${result.length > 80 ? '…' : ''}${C.reset}\n`);
 
       messages.push({ role: 'assistant', content });
 
