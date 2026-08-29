@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import type { TokenUsage } from '../llm/index.js';
+import { emptyUsage } from '../llm/index.js';
 
 const SESSIONS_DIR = path.join(process.cwd(), '.sessions');
 
@@ -20,6 +22,17 @@ export interface Session {
   toolCalls: ToolCallRecord[];
   finalResponse: string;
   durationMs: number;
+  tokens: number;        // real total = input + output (+ cache); 0 for local (free)
+  usage: TokenUsage;     // full breakdown
+}
+
+export interface TokenStats {
+  claudeTokens: number;  // real tokens billed to Claude (paid backends)
+  localTokens: number;   // tokens run on the free local model (the actual saving)
+  claudeInput: number;
+  claudeOutput: number;
+  savedPct: number;      // share of all work that ran local (0–100)
+  sessions: number;
 }
 
 function ensureSessionsDir(): void {
@@ -61,4 +74,26 @@ export function getSession(id: string): Session | null {
   const filePath = path.join(SESSIONS_DIR, `${id}.json`);
   if (!fs.existsSync(filePath)) return null;
   return JSON.parse(fs.readFileSync(filePath, 'utf8')) as Session;
+}
+
+// Aggregate real token cost across all saved sessions. Claude tokens are what you
+// actually paid for; local tokens are what the free model handled — the saving.
+export function sessionStats(): TokenStats {
+  const stats: TokenStats = {
+    claudeTokens: 0, localTokens: 0, claudeInput: 0, claudeOutput: 0, savedPct: 0, sessions: 0,
+  };
+  for (const s of listSessions()) {
+    stats.sessions++;
+    const u = s.usage ?? emptyUsage();
+    if (s.backend === 'local') {
+      stats.localTokens += s.tokens ?? (u.input + u.output);
+    } else {
+      stats.claudeTokens += s.tokens ?? (u.input + u.output);
+      stats.claudeInput += u.input + u.cacheRead + u.cacheCreation;
+      stats.claudeOutput += u.output;
+    }
+  }
+  const total = stats.claudeTokens + stats.localTokens;
+  stats.savedPct = total > 0 ? Math.round((stats.localTokens / total) * 100) : 0;
+  return stats;
 }

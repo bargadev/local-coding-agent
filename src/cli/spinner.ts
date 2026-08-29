@@ -30,6 +30,7 @@ export class Spinner {
   private ing: string;
   private ed: string;
   private pulse = false;
+  private tokens = 0;
 
   constructor(_label: string) {
     const [ing, ed] = VERBS[Math.floor(Math.random() * VERBS.length)];
@@ -41,6 +42,12 @@ export class Spinner {
     this.startMs = Date.now();
     this.render();
     this.timer = setInterval(() => { this.pulse = !this.pulse; this.render(); }, 600);
+  }
+
+  // Live output-token count, rendered as "↓ N tok" inside the spinner line.
+  setTokens(n: number): void {
+    this.tokens = n;
+    this.render();
   }
 
   stop(): { elapsedSec: number; verb: string } {
@@ -59,9 +66,10 @@ export class Spinner {
   private render(): void {
     const elapsed = Math.round((Date.now() - this.startMs) / 1000);
     const star = this.pulse ? '✳' : '✴';
+    const meta = this.tokens > 0 ? `${elapsed}s · ↓ ${this.tokens} tok` : `${elapsed}s`;
     this.clearLine();
     process.stdout.write(
-      `${C.coral}${star}${C.reset} ${C.bold}${this.ing}…${C.reset} ${C.dim}(${elapsed}s)${C.reset}`
+      `${C.coral}${star}${C.reset} ${C.bold}${this.ing}…${C.reset} ${C.dim}(${meta})${C.reset}`
     );
   }
 }

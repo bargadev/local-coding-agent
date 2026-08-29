@@ -1,4 +1,5 @@
-import type { LLMClient, Message } from '../llm/index.js';
+import type { LLMClient, Message, ProgressCallback, TokenUsage } from '../llm/index.js';
+import { emptyUsage, totalTokens } from '../llm/index.js';
 import { parseToolCall, executeTool } from '../tools/registry.js';
 import { buildSystemPrompt } from './system-prompt.js';
 import { C } from '../cli/spinner.js';
@@ -9,21 +10,44 @@ export interface AgentResult {
   response: string;
   iterations: number;
   toolCalls: number;
+  tokens: number;       // total tokens (input + output) across all iterations
+  usage: TokenUsage;    // full breakdown, summed over every iteration
+  hitLimit: boolean;    // true = ran out of iterations without converging
 }
 
-export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentResult> {
+export async function runAgentLoop(
+  task: string,
+  llm: LLMClient,
+  onProgress?: ProgressCallback,
+): Promise<AgentResult> {
   const messages: Message[] = [
     { role: 'system', content: buildSystemPrompt(task) },
     { role: 'user', content: task },
   ];
 
+  const NUDGE_BUDGET = 2; // times we push a "you didn't edit anything" reminder before giving up
   let iterations = 0;
   let toolCalls = 0;
+  let writes = 0;         // number of write_file calls
+  let nudges = 0;
+  // Every iteration re-sends the whole message history, so input tokens accumulate
+  // hard — this sum is the real cost, not the final message's word count.
+  const usage = emptyUsage();
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
 
-    const response = await llm.chat(messages);
+    const soFar = totalTokens(usage);
+    const response = await llm.chat(
+      messages,
+      onProgress ? (t) => onProgress(soFar + t) : undefined,
+    );
+    if (response.usage) {
+      usage.input += response.usage.input;
+      usage.output += response.usage.output;
+      usage.cacheRead += response.usage.cacheRead;
+      usage.cacheCreation += response.usage.cacheCreation;
+    }
     const content = response.content;
 
     // Check every line for a tool call
@@ -36,6 +60,7 @@ export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentR
 
       toolCallFound = true;
       toolCalls++;
+      if (call.tool === 'write_file') writes++;
 
       const argStr = Object.entries(call.args).map(([k, v]) => `${k}: ${String(v).slice(0, 40)}`).join(', ');
       process.stdout.write(`${C.dim}  └ ${call.tool}(${argStr})${C.reset}\n`);
@@ -56,8 +81,24 @@ export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentR
     }
 
     if (!toolCallFound) {
+      // The model tried to finish. If it never actually edited a file, it likely
+      // just inspected the code and declared success (common with small models) —
+      // push back and give it another shot before accepting the answer.
+      if (writes === 0 && nudges < NUDGE_BUDGET) {
+        nudges++;
+        process.stdout.write(`${C.dim}  ↺ no file edited yet — asking the model to make the change${C.reset}\n`);
+        messages.push({ role: 'assistant', content });
+        messages.push({
+          role: 'user',
+          content:
+            'You have not modified any file yet — reading code or running tests is not enough. ' +
+            'If the task requires changing code, make the edit NOW with write_file, passing the full new file content. ' +
+            'Then run the tests. If no code change is genuinely needed, state that explicitly and why.',
+        });
+        continue;
+      }
       // No tool call = final response
-      return { response: content, iterations, toolCalls };
+      return { response: content, iterations, toolCalls, tokens: totalTokens(usage), usage, hitLimit: false };
     }
   }
 
@@ -65,5 +106,8 @@ export async function runAgentLoop(task: string, llm: LLMClient): Promise<AgentR
     response: `Agent reached iteration limit (${MAX_ITERATIONS}). Last response may be incomplete.`,
     iterations,
     toolCalls,
+    tokens: totalTokens(usage),
+    usage,
+    hitLimit: true,
   };
 }
