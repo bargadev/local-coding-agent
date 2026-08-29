@@ -1,1 +1,3 @@
-lakonai-graph/
+node_modules
+*.log
+*.tmp
