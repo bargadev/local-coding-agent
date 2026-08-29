@@ -19,6 +19,20 @@ describe('parseToolCall', () => {
   it('returns null for JSON without tool field', () => {
     expect(parseToolCall('{"action":"list"}')).toBeNull();
   });
+
+  it('parses a multi-line write_file call whose content has newlines', () => {
+    const blob = 'Sure, here is the fix:\n{\n  "tool": "write_file",\n  "args": {\n    "path": "src/a.ts",\n    "content": "export const a = 1;\\nexport const b = 2;\\n"\n  }\n}';
+    const r = parseToolCall(blob);
+    expect(r?.tool).toBe('write_file');
+    expect(r?.args.path).toBe('src/a.ts');
+    expect(r?.args.content).toContain('export const b = 2;');
+  });
+
+  it('parses a tool call wrapped in a ``` fence', () => {
+    const r = parseToolCall('```json\n{"tool":"read_file","args":{"path":"x.ts"}}\n```');
+    expect(r?.tool).toBe('read_file');
+    expect(r?.args.path).toBe('x.ts');
+  });
 });
 
 describe('executeTool', () => {
