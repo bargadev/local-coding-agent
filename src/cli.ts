@@ -6,24 +6,44 @@ import * as fs from 'fs';
 import { execSync } from 'child_process';
 import { ensureClaudeCLI } from './setup/index.js';
 import { respond } from './agent/respond.js';
+import type { TokenUsage } from './llm/index.js';
+import { sessionStats } from './session/index.js';
 import { gitSnapshot, formatGitSummary, gitDiff } from './tools/git.js';
 
 const EXIT_COMMANDS = new Set(['exit', 'quit', 'q', '.exit']);
+const STATS_COMMANDS = new Set(['stats', '/stats', 'tokens', '/tokens']);
 
-function printResponse(content: string, elapsedSec: number, verb: string, tokens: number, isLocal: boolean): void {
+// 4200 → "4.2k", 326 → "326"
+function fmt(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+function printResponse(content: string, elapsedSec: number, verb: string, tokens: number, usage: TokenUsage, isLocal: boolean): void {
   // Bullet-prefixed response
   const lines = content.split('\n');
   process.stdout.write(`\n${C.bold}●${C.reset} ${lines[0]}\n`);
   if (lines.length > 1) process.stdout.write(lines.slice(1).join('\n') + '\n');
 
-  // Timing line: ✳ Verb for Xs · done HH:MM · ↓ N tokens
+  // Timing line: ✳ Verb for Xs · done HH:MM · ↕ N tokens (in · out)
   const now = new Date();
   const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const billedIn = usage.input + usage.cacheRead + usage.cacheCreation;
+  // Real cost = input (incl. re-sent context) + output. Local runs are free.
   const tokenPart = isLocal
-    ? `${C.dim} · ${C.reset}${C.green}free${C.reset}`
-    : `${C.dim} · ${C.reset}${C.cyan}↓ ${tokens} tokens${C.reset}`;
+    ? `${C.dim} · ${C.reset}${C.green}free${C.dim} (${fmt(tokens)} tok local)${C.reset}`
+    : `${C.dim} · ${C.reset}${C.cyan}↕ ${fmt(tokens)} tokens${C.reset}${C.dim} (${fmt(billedIn)} in · ${fmt(usage.output)} out)${C.reset}`;
   process.stdout.write(
     `\n${C.yellow}✳${C.reset} ${C.dim}${verb} for ${elapsedSec}s · done ${time}${C.reset}${tokenPart}\n`
+  );
+}
+
+function printStats(): void {
+  const s = sessionStats();
+  process.stdout.write(
+    `\n${C.bold}● Token usage${C.reset} ${C.dim}(${s.sessions} sessions)${C.reset}\n` +
+    `  ${C.cyan}Claude billed${C.reset} : ${fmt(s.claudeTokens)} tokens ${C.dim}(${fmt(s.claudeInput)} in · ${fmt(s.claudeOutput)} out)${C.reset}\n` +
+    `  ${C.green}Ran local${C.reset}     : ${fmt(s.localTokens)} tokens ${C.dim}(free)${C.reset}\n` +
+    `  ${C.dim}Work on local : ${s.savedPct}%${C.reset}\n`
   );
 }
 
@@ -107,8 +127,8 @@ async function runOnce(input: string): Promise<void> {
   let gitBefore = { status: '', branch: '' };
   try { gitBefore = gitSnapshot(); } catch { /* not a git repo */ }
 
-  const { content, elapsedSec, verb, tokens, isLocal } = await respond(input);
-  printResponse(content, elapsedSec, verb, tokens, isLocal);
+  const { content, elapsedSec, verb, tokens, usage, isLocal } = await respond(input);
+  printResponse(content, elapsedSec, verb, tokens, usage, isLocal);
 
   try {
     const diff = gitDiff();
@@ -182,9 +202,9 @@ async function runInteractive(): Promise<void> {
       try { gitBefore = gitSnapshot(); } catch { /* not a git repo */ }
 
       try {
-        const { content, elapsedSec, verb, tokens, isLocal } = await respond(input);
+        const { content, elapsedSec, verb, tokens, usage, isLocal } = await respond(input);
         tier = isLocal ? 'local' : 'cloud';
-        printResponse(content, elapsedSec, verb, tokens, isLocal);
+        printResponse(content, elapsedSec, verb, tokens, usage, isLocal);
 
         try {
           const diff = gitDiff();
@@ -227,6 +247,14 @@ async function runInteractive(): Promise<void> {
           const input = buf.trim();
           buf = '';
           if (EXIT_COMMANDS.has(input.toLowerCase())) { done(); return; }
+          if (STATS_COMMANDS.has(input.toLowerCase())) {
+            drawBox();
+            process.stdout.write('\x1b8'); // restore output position (above the box)
+            printStats();
+            saveOut();
+            drawBox();
+            return;
+          }
           drawBox();       // clear the just-submitted text from the prompt line
           submit(input);
           if (busy) return; // stop consuming this chunk while processing
@@ -248,6 +276,7 @@ async function main(): Promise<void> {
   const input = args.join(' ').trim();
 
   if (input) {
+    if (STATS_COMMANDS.has(input.toLowerCase())) { printStats(); return; }
     await runOnce(input);
   } else {
     await runInteractive();
