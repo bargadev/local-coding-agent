@@ -62,6 +62,28 @@ async function runBackend(
   return { content: r.content, tokens: r.tokens ?? 0, usage: r.usage ?? emptyUsage(), iterations: 1, toolCalls: 0, hitLimit: false };
 }
 
+// Polish the final answer with a second pass through the same backend. Non-fatal:
+// if the pass fails, keep the original content so a bad enhance never loses the
+// real answer. Returns the enhance call's own usage so accounting stays honest.
+async function enhanceResponse(
+  llm: LLMClient,
+  content: string,
+): Promise<{ content: string; usage: TokenUsage; tokens: number }> {
+  const spinner = new Spinner('enhancing');
+  spinner.start();
+  try {
+    const enhanced = await llm.chat(
+      [{ role: 'system', content: SYSTEM_CHAT }, { role: 'user', content }],
+      (t: number) => spinner.setTokens(t),
+    );
+    spinner.stop();
+    return { content: enhanced.content, usage: enhanced.usage ?? emptyUsage(), tokens: enhanced.tokens ?? 0 };
+  } catch {
+    spinner.stop();
+    return { content, usage: emptyUsage(), tokens: 0 };
+  }
+}
+
 export async function respond(prompt: string): Promise<AgentResponse> {
   const start = Date.now();
   // Start the spinner immediately so it appears the instant Enter is pressed,
@@ -86,7 +108,8 @@ export async function respond(prompt: string): Promise<AgentResponse> {
   // the free model actually fails, so successes stay free.
   const escalateToSonnet = async (why: string): Promise<AgentResponse> => {
     spinner.stop();
-    process.stdout.write(`${C.yellow}⚠${C.reset} local ${why} — escalating to sonnet\n`);
+    process.stdout.write(`${C.yellow}⚠${C.reset} local ${why} — escalating to sonnet
+`);
     spinner = new Spinner('sonnet');
     spinner.start();
     const out = await runBackend('sonnet', true, prompt, spinner);
@@ -110,7 +133,19 @@ export async function respond(prompt: string): Promise<AgentResponse> {
       }
     }
     const { elapsedSec, verb } = spinner.stop();
-    return finish(route.backend, isLocal, out, elapsedSec, verb);
+    const enhanced = await enhanceResponse(buildClient(route.backend), out.content);
+    const merged: Outcome = {
+      ...out,
+      content: enhanced.content,
+      tokens: out.tokens + enhanced.tokens,
+      usage: {
+        input: out.usage.input + enhanced.usage.input,
+        output: out.usage.output + enhanced.usage.output,
+        cacheRead: out.usage.cacheRead + enhanced.usage.cacheRead,
+        cacheCreation: out.usage.cacheCreation + enhanced.usage.cacheCreation,
+      },
+    };
+    return finish(route.backend, isLocal, merged, elapsedSec, verb);
   } catch (err) {
     if (isLocal) {
       return await escalateToSonnet('failed');
