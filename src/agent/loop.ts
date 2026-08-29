@@ -25,7 +25,7 @@ export async function runAgentLoop(
     { role: 'user', content: task },
   ];
 
-  const NUDGE_BUDGET = 2; // times we push a "you didn't edit anything" reminder before giving up
+  const NUDGE_BUDGET = 3; // times we push a "you didn't edit anything" reminder before giving up
   let iterations = 0;
   let toolCalls = 0;
   let writes = 0;         // number of write_file calls
@@ -50,15 +50,8 @@ export async function runAgentLoop(
     }
     const content = response.content;
 
-    // Check every line for a tool call
-    const lines = content.split('\n');
-    let toolCallFound = false;
-
-    for (const line of lines) {
-      const call = parseToolCall(line);
-      if (!call) continue;
-
-      toolCallFound = true;
+    const call = parseToolCall(content);
+    if (call) {
       toolCalls++;
       if (call.tool === 'write_file') writes++;
 
@@ -74,32 +67,35 @@ export async function runAgentLoop(
       let toolResultMsg = `Tool result for ${call.tool}:\n${result}`;
       if (call.tool === 'run_command' && result.includes('exit: 1')) {
         toolResultMsg += '\n\nTests or command failed. Analyze the error above, fix the code with write_file, and run the tests again.';
+      } else if (call.tool === 'run_command' && writes === 0) {
+        // Ran a command but hasn't edited anything — the classic "inspect and
+        // declare done" trap. Redirect it to actually make the change.
+        toolResultMsg += '\n\nNote: you have not edited any file yet. Running a command does not complete a task that asks you to change code. Read the target file if needed, then call write_file with the full new content.';
       }
 
       messages.push({ role: 'user', content: toolResultMsg });
-      break; // one tool call per turn
+      continue; // one tool call per turn
     }
 
-    if (!toolCallFound) {
-      // The model tried to finish. If it never actually edited a file, it likely
-      // just inspected the code and declared success (common with small models) —
-      // push back and give it another shot before accepting the answer.
-      if (writes === 0 && nudges < NUDGE_BUDGET) {
-        nudges++;
-        process.stdout.write(`${C.dim}  ↺ no file edited yet — asking the model to make the change${C.reset}\n`);
-        messages.push({ role: 'assistant', content });
-        messages.push({
-          role: 'user',
-          content:
-            'You have not modified any file yet — reading code or running tests is not enough. ' +
-            'If the task requires changing code, make the edit NOW with write_file, passing the full new file content. ' +
-            'Then run the tests. If no code change is genuinely needed, state that explicitly and why.',
-        });
-        continue;
-      }
-      // No tool call = final response
-      return { response: content, iterations, toolCalls, tokens: totalTokens(usage), usage, hitLimit: false };
+    // The model tried to finish. If it never actually edited a file, it likely
+    // just inspected the code and declared success (common with small models) —
+    // push back with the concrete next step before accepting the answer.
+    if (writes === 0 && nudges < NUDGE_BUDGET) {
+      nudges++;
+      process.stdout.write(`${C.dim}  ↺ no file edited yet — asking the model to make the change${C.reset}\n`);
+      messages.push({ role: 'assistant', content });
+      messages.push({
+        role: 'user',
+        content:
+          'You have NOT modified any file yet — reading or running tests does not complete the task. ' +
+          'Do this now, one tool call at a time: (1) read_file the target file to get its exact current content, ' +
+          '(2) write_file the same path with the COMPLETE updated content (the whole file, not a diff). ' +
+          'Emit only the tool-call JSON. If no code change is genuinely needed, say so explicitly and why.',
+      });
+      continue;
     }
+    // No tool call = final response
+    return { response: content, iterations, toolCalls, tokens: totalTokens(usage), usage, hitLimit: false };
   }
 
   return {
