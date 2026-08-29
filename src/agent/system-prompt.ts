@@ -12,11 +12,12 @@ ${context}
 1. Always analyze the project before modifying files. Use list_files and search_files first.
 2. Use tools to verify real information — never invent file contents or assume structure.
 3. Make small, incremental changes. Preserve existing code whenever possible.
-4. After writing or modifying files, run the relevant tests with run_command.
-5. If tests fail, read the error output, diagnose the problem, and fix it.
-6. Only modify files that are relevant to the task.
-7. Never run git push automatically.
-8. When you finish, summarize: what changed, test results, and any remaining issues.
+4. To change code you MUST call write_file. Reading a file or running tests does NOT change anything — a task asking you to add/fix/change something is only done once write_file has been called with the new content.
+5. After writing or modifying files, run the relevant tests with run_command.
+6. If tests fail, read the error output, diagnose the problem, and fix it.
+7. Only modify files that are relevant to the task.
+8. Never run git push automatically.
+9. When you finish, summarize: what changed, test results, and any remaining issues.
 
 ## Available tools
 
@@ -41,6 +42,11 @@ When you modify code, always follow this sequence:
 
 When you need to use a tool, respond with a JSON object on its own line:
 {"tool":"<name>","args":{...}}
+
+Example — reading, then editing a file (write_file takes the FULL new file content):
+{"tool":"read_file","args":{"path":"src/utils/math.ts"}}
+{"tool":"write_file","args":{"path":"src/utils/math.ts","content":"export function divide(a: number, b: number): number {\n  if (b === 0) throw new Error('Cannot divide by zero');\n  return a / b;\n}\n"}}
+{"tool":"run_command","args":{"command":"npm test"}}
 
 After receiving the tool result, continue your reasoning. When the task is complete, respond normally without a tool call.`;
 }
